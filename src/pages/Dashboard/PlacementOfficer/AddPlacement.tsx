@@ -20,10 +20,13 @@ import { Loader2, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
+import { ExcelImport } from "@/components/placement/ExcelImport";
+
 export default function AddPlacement() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [isLoading, setIsLoading] = useState(false);
+    const [importedData, setImportedData] = useState<any[]>([]);
 
     // Fetch Companies
     const { data: companies } = useQuery({
@@ -78,6 +81,12 @@ export default function AddPlacement() {
         }));
     };
 
+    // Auto-calculate stats if columns match standard names (optional convenience)
+    const handleDataImported = (data: any[]) => {
+        setImportedData(data);
+        // Potential future enhancement: Auto-map "Department" column to stats
+    };
+
     const onSubmit = async (data: any) => {
         try {
             setIsLoading(true);
@@ -94,7 +103,7 @@ export default function AddPlacement() {
                     role_offered: data.roleOffered,
                     ctc_amount: data.ctcAmount ? parseFloat(data.ctcAmount) : null,
                     stipend_amount: data.stipendAmount ? parseFloat(data.stipendAmount) : null,
-                    remarks: data.remarks, // Storing student names/detailed report here
+                    remarks: data.remarks + (importedData.length ? `\n\nIncluded ${importedData.length} records from imported file.` : ""),
                 })
                 .select()
                 .single();
@@ -139,6 +148,9 @@ export default function AddPlacement() {
                         Enter details about a placement drive, including student selection stats and reports.
                     </p>
                 </div>
+
+                {/* Excel Import Utility */}
+                <ExcelImport onDataImported={handleDataImported} />
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                     {/* Company & Drive Details */}
