@@ -25,6 +25,7 @@ import {
   PieChart,
   Settings,
   Plus,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ const tpoNavItems: NavItem[] = [
   { title: "Overview", url: "/dashboard/tpo", icon: LayoutDashboard },
   { title: "Companies", url: "/dashboard/tpo/companies", icon: Building2 },
   { title: "Placement Drives", url: "/dashboard/tpo/drives", icon: CalendarDays },
+  { title: "Placement Records", url: "/dashboard/tpo/student-placements", icon: Briefcase },
   { title: "Statistics", url: "/dashboard/tpo/statistics", icon: BarChart3 },
   { title: "Reports", url: "/dashboard/tpo/reports", icon: FileText },
   { title: "Add Placement", url: "/dashboard/tpo/add-placement", icon: Plus },
@@ -45,6 +47,8 @@ const tpoNavItems: NavItem[] = [
 
 const coordinatorNavItems: NavItem[] = [
   { title: "Overview", url: "/dashboard/coordinator", icon: LayoutDashboard },
+  { title: "Placement Drives", url: "/dashboard/coordinator/drives", icon: CalendarDays },
+  { title: "Placement Records", url: "/dashboard/coordinator/student-placements", icon: Briefcase },
 ];
 
 const managementNavItems: NavItem[] = [

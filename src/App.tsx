@@ -23,6 +23,7 @@ import DepartmentDrives from "./pages/Dashboard/DepartmentCoordinator/Department
 import ManagementOverview from "./pages/Dashboard/Management/Overview";
 import Placements from "./pages/Placements";
 import AddPlacement from "./pages/Dashboard/PlacementOfficer/AddPlacement";
+import StudentRecords from "./pages/Dashboard/PlacementOfficer/StudentRecords";
 import Settings from "./pages/Dashboard/Settings";
 
 const queryClient = new QueryClient();
@@ -88,6 +89,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/dashboard/tpo/student-placements"
+              element={
+                <ProtectedRoute allowedRoles={["placement_officer"]}>
+                  <StudentRecords />
+                </ProtectedRoute>
+              }
+            />
 
             {/* HOD Routes */}
             <Route
@@ -103,6 +112,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["department_coordinator"]}>
                   <DepartmentDrives />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/coordinator/student-placements"
+              element={
+                <ProtectedRoute allowedRoles={["department_coordinator"]}>
+                  <StudentRecords />
                 </ProtectedRoute>
               }
             />

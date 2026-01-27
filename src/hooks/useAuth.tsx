@@ -229,7 +229,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      // Explicit state clearing
+      setUser(null);
+      setSession(null);
+      setRole(null);
+      setProfile(null);
+      setDepartmentId(null);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   // Check for existing session on load is handled by the useEffect above

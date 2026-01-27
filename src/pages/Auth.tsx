@@ -220,9 +220,16 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 hero-gradient relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        <div className="relative z-10 flex flex-col justify-center px-12 py-16">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-black">
+        {/* Background Image - Centered and Full Coverage */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/auth-bg.png')" }}
+        />
+        {/* Suitable Overlay - Semi-transparent black for text readability */}
+        <div className="absolute inset-0 bg-black/55" />
+
+        <div className="relative z-10 flex flex-col justify-center h-full px-12 py-16">
           <div className="mb-8 flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm p-2">
               <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
