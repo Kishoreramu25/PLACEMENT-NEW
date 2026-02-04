@@ -72,11 +72,43 @@ type StudentPlacement = {
 
 export function StudentPlacementTable() {
     const queryClient = useQueryClient();
-    const [searchTerm, setSearchTerm] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false); // New Dialog State
     const [newColumnName, setNewColumnName] = useState(""); // New Column Input
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [filters, setFilters] = useState<Record<string, string>>({});
+
+    const FILTER_FIELDS: Record<string, string> = {
+        company_name: "Company Name",
+        company_mail: "Company Mail",
+        company_address: "Company Address",
+        hr_name: "HR Name",
+        hr_mail: "HR Mail",
+        student_name: "Student Name",
+        department: "Dept",
+        offer_type: "Type",
+        salary: "Salary",
+        package_lpa: "Package (LPA)",
+        student_id: "Student ID",
+        student_mail: "Student Mail",
+        student_mobile: "Student Mobile",
+        student_address: "Student Address",
+        current_year: "Year",
+        semester: "Sem",
+        join_date: "Join Date"
+    };
+
+    const handleAddFilter = (key: string, value: string) => {
+        if (key && value) {
+            setFilters(prev => ({ ...prev, [key]: value }));
+        }
+    };
+
+    const removeFilter = (key: string) => {
+        const newFilters = { ...filters };
+        delete newFilters[key];
+        setFilters(newFilters);
+    };
 
     // Load custom columns from local storage or empty
     const [customColumns, setCustomColumns] = useState<string[]>(() => {
@@ -327,23 +359,23 @@ export function StudentPlacementTable() {
         return () => window.removeEventListener("paste", pasteHandler);
     }, []);
 
-    // Filter
+    // Unified Filter Logic
     const filteredData = placements?.filter((p: any) => {
-        const searchLower = searchTerm.toLowerCase();
-        const matchesStandard =
-            p.student_name?.toLowerCase().includes(searchLower) ||
-            p.company_name?.toLowerCase().includes(searchLower) ||
-            p.student_id?.toLowerCase().includes(searchLower);
+        // Specific Filters
+        return Object.entries(filters).every(([key, value]) => {
+            if (!value) return true;
+            const valLower = value.toLowerCase();
 
-        if (matchesStandard) return true;
-
-        if (p.other_details) {
-            const details = p.other_details as Record<string, any>;
-            return customColumns.some(col =>
-                String(details[col] || "").toLowerCase().includes(searchLower)
-            );
-        }
-        return false;
+            // Check standard fields
+            if (p[key] !== undefined) {
+                return String(p[key]).toLowerCase().includes(valLower);
+            }
+            // Check custom/other fields
+            if (p.other_details && p.other_details[key] !== undefined) {
+                return String(p.other_details[key]).toLowerCase().includes(valLower);
+            }
+            return false;
+        });
     });
 
     // Export to Excel
@@ -385,15 +417,6 @@ export function StudentPlacementTable() {
                         onChange={handleFileUpload}
                     />
 
-                    <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search..."
-                            className="pl-8"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
 
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="whitespace-nowrap">
                         <Upload className="mr-2 h-4 w-4" />
@@ -416,6 +439,80 @@ export function StudentPlacementTable() {
                         Add New
                     </Button>
                 </div>
+            </div>
+
+            {/* Filter Section */}
+            <div className="flex flex-col gap-4 p-4 border rounded-md bg-muted/20">
+                <div className="flex flex-wrap gap-2 items-end">
+                    <div className="space-y-2 min-w-[200px]">
+                        <Label>Filter Column</Label>
+                        <Select onValueChange={(val) => {
+                            const input = document.getElementById("filter-value-input") as HTMLInputElement;
+                            if (input) input.dataset.column = val;
+                        }}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(FILTER_FIELDS).map(([key, label]) => (
+                                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                                ))}
+                                {customColumns.map(col => (
+                                    <SelectItem key={col} value={col}>{col} (Custom)</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2 min-w-[200px]">
+                        <Label>Value</Label>
+                        <Input
+                            id="filter-value-input"
+                            placeholder="Type to filter..."
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    const target = e.target as HTMLInputElement;
+                                    const col = target.dataset.column;
+                                    if (col) {
+                                        handleAddFilter(col, target.value);
+                                        target.value = "";
+                                    } else {
+                                        toast.error("Please select a column first");
+                                    }
+                                }
+                            }}
+                        />
+                    </div>
+                    <Button onClick={() => {
+                        const input = document.getElementById("filter-value-input") as HTMLInputElement;
+                        const col = input?.dataset.column;
+                        if (col && input.value) {
+                            handleAddFilter(col, input.value);
+                            input.value = "";
+                        } else {
+                            toast.error("Select a column and enter a value");
+                        }
+                    }}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Filter
+                    </Button>
+                </div>
+
+                {/* Active Filters */}
+                {Object.keys(filters).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {Object.entries(filters).map(([key, value]) => (
+                            <div key={key} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
+                                <span className="font-medium">{FILTER_FIELDS[key] || key}:</span>
+                                <span>{value}</span>
+                                <button onClick={() => removeFilter(key)} className="ml-1 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </div>
+                        ))}
+                        <Button variant="ghost" size="sm" onClick={() => setFilters({})} className="text-xs h-7">
+                            Clear All
+                        </Button>
+                    </div>
+                )}
             </div>
 
             <div className="rounded-md border overflow-x-auto">
