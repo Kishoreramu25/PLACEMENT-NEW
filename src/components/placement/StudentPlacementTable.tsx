@@ -39,10 +39,11 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2, Plus, Search, FileDown, Columns, X } from "lucide-react";
+import { Pencil, Trash2, Plus, Search, FileDown, Columns, X, Upload, Clipboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import * as XLSX from "xlsx";
+import { useRef } from "react";
 
 // Detailed Type Definition based on user request
 type StudentPlacement = {
@@ -125,6 +126,207 @@ export function StudentPlacementTable() {
         }
     });
 
+    // Bulk Insert Mutation
+    // Bulk Insert Mutation (Batched)
+    const bulkInsertMutation = useMutation({
+        mutationFn: async (records: Partial<StudentPlacement>[]) => {
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < records.length; i += BATCH_SIZE) {
+                const batch = records.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase.from("student_placements" as any).insert(batch);
+                if (error) throw error;
+            }
+        },
+        onSuccess: (data, variables) => {
+            toast.success(`Successfully imported ${variables.length} records`);
+            queryClient.invalidateQueries({ queryKey: ["student-placements"] });
+        },
+        onError: (error) => {
+            console.error(error);
+            toast.error("Failed to import records: " + error.message);
+        }
+    });
+
+    // Helper: Map Excel Rows
+    const mapExcelRowToStudentPlacement = (row: any): Partial<StudentPlacement> => {
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const findKey = (keys: string[], exclude: string[] = []) => {
+            const rowKeys = Object.keys(row);
+            const normalizedSearch = keys.map(normalize);
+            const normalizedExclude = exclude.map(normalize);
+
+            // Exact match
+            for (const key of keys) {
+                if (row[key] !== undefined) return row[key];
+            }
+            // Fuzzy match
+            for (const rKey of rowKeys) {
+                const normRKey = normalize(rKey);
+                // Skip excluded keys
+                if (normalizedExclude.some(e => normRKey.includes(e))) continue;
+
+                if (normalizedSearch.some(k => normRKey.includes(k) || k.includes(normRKey))) {
+                    return row[rKey];
+                }
+            }
+            return undefined;
+        };
+
+        const getVal = (keys: string[], exclude: string[] = []) => String(findKey(keys, exclude) || "").trim();
+
+        // Date parser helper
+        const parseDate = (val: string) => {
+            if (!val) return new Date().toISOString().split('T')[0];
+            // Handle Excel serial date (numeric)
+            if (!isNaN(Number(val)) && Number(val) > 20000) {
+                const date = new Date((Number(val) - (25567 + 2)) * 86400 * 1000);
+                return date.toISOString().split('T')[0];
+            }
+            // Handle string dates
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+            return d.toISOString().split('T')[0];
+        };
+
+        const baseRecord = {
+            company_name: getVal(["company_name", "Company", "Organization", "Name of Company", "Company Name"]),
+            company_mail: getVal(["company_mail", "Company Mail", "Mail ID", "Company Email"]),
+            company_address: getVal(["company_address", "Address", "Company Location"]),
+            hr_name: getVal(["hr_name", "HR Name", "Contact Person"], ["company"]), // Exclude company to match "Name" safely? No, HR Name usually distinct.
+            hr_mail: getVal(["hr_mail", "HR Mail", "HR Email"]),
+            // Crucial Fix: Exclude "company", "hr", "project" from Student Name search
+            student_name: getVal(["student_name", "Student Name", "Name", "Candidate", "Candidate Name", "Name of the Student", "Student"], ["company", "hr", "project", "college"]),
+            student_id: getVal(["student_id", "Register No", "USN", "Roll No", "ID"], ["comp", "email"]),
+            student_mail: getVal(["student_mail", "Student Mail", "Email", "Student Email"], ["company", "hr"]),
+            student_mobile: getVal(["student_mobile", "Student Mobile", "Mobile", "Phone"], ["company", "hr"]),
+            student_address: getVal(["student_address", "Student Address", "Residence"], ["company"]),
+            department: getVal(["department", "Dept", "Branch", "Department"]),
+            offer_type: getVal(["offer_type", "Offer Type", "Job Type", "Type"]),
+            salary: Number(getVal(["salary", "Salary", "Stipend"])) || 0,
+            package_lpa: Number(getVal(["package_lpa", "LPA", "Package", "CTC"])) || 0,
+            current_year: Number(getVal(["current_year", "Year", "Batch"])) || new Date().getFullYear(),
+            semester: Number(getVal(["semester", "Semester", "Sem"])) || 0,
+            join_date: parseDate(getVal(["join_date", "Join Date", "Date of Joining"])),
+            ref_no: getVal(["ref_no", "Ref No", "Reference", "Offer ID"]),
+        };
+
+        // Filter out obvious junk rows (headers, titles)
+        if (!baseRecord.student_name || baseRecord.student_name.toLowerCase().includes("department of")) {
+            return {};
+        }
+
+        return baseRecord;
+    };
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const fileList = Array.from(files);
+        const processedFiles: string[] = [];
+        const loadingToast = toast.loading("Processing files...");
+
+        try {
+            const allRecords = await Promise.all(fileList.map(async (file) => {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                let records: any[] = [];
+                workbook.SheetNames.forEach(name => {
+                    const ws = workbook.Sheets[name];
+                    const jsonData = XLSX.utils.sheet_to_json(ws);
+                    if (jsonData.length) records.push(...jsonData);
+                });
+                processedFiles.push(file.name);
+                return records.map(mapExcelRowToStudentPlacement);
+            }));
+
+            const flatRecords = allRecords.flat().filter(r => r.student_name && Object.keys(r).length > 2);
+            toast.dismiss(loadingToast);
+
+            if (flatRecords.length > 0) {
+                if (window.confirm(`Found ${flatRecords.length} records in ${processedFiles.join(", ")}. Import them now?`)) {
+                    bulkInsertMutation.mutate(flatRecords);
+                }
+            } else {
+                toast.error("No valid data found in files");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.dismiss(loadingToast);
+            toast.error("Import failed");
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const handlePasteFromClipboard = async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!text) return toast.error("Clipboard empty");
+            processClipboardData(text);
+        } catch (err) {
+            toast.error("Failed to read clipboard");
+        }
+    };
+
+    const processClipboardData = (text: string) => {
+        try {
+            const rows = text.split(/\r?\n/).filter(r => r.trim());
+            if (!rows.length) return;
+
+            const matrix = rows.map(r => r.split("\t"));
+            const headers = matrix[0];
+            const isHeader = headers.some(h => ["Name", "USN", "Company", "Salary"].some(k => h.toLowerCase().includes(k.toLowerCase())));
+
+            let dataToImport: any[] = [];
+
+            if (isHeader) {
+                const keys = headers;
+                dataToImport = matrix.slice(1).map(row => {
+                    const obj: any = {};
+                    row.forEach((val, i) => { if (keys[i]) obj[keys[i]] = val; });
+                    return obj;
+                });
+            } else {
+                if (!window.confirm("No headers detected in first row. Ensure typical column order or use an Excel file. Proceed with best-effort import?")) return;
+                // If no headers, try to map positionally if we assume a standard template? 
+                // That's risky. Let's just create raw objects and let mapper handle it if keys happen to match (unlikely).
+                // Better approach: Require headers for paste.
+                toast.info("Please explicitly include headers (Name, USN, Company...) for accurate paste.");
+                return;
+            }
+
+            if (dataToImport.length > 0) {
+                const records = dataToImport.map(mapExcelRowToStudentPlacement);
+                bulkInsertMutation.mutate(records);
+            }
+
+        } catch (err) {
+            console.error("Paste parse error", err);
+            toast.error("Failed to parse clipboard data");
+        }
+    };
+
+    // Global Paste Listener
+    useEffect(() => {
+        const pasteHandler = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+            const text = e.clipboardData?.getData("text");
+            if (text && text.length > 5 && (text.includes("\t") || text.includes("\n"))) {
+                // Heuristic to detect table data
+                if (window.confirm("Clipboard data detected. Import as new student records?")) {
+                    processClipboardData(text);
+                }
+            }
+        };
+        window.addEventListener("paste", pasteHandler);
+        return () => window.removeEventListener("paste", pasteHandler);
+    }, []);
+
     // Filter
     const filteredData = placements?.filter((p: any) => {
         const searchLower = searchTerm.toLowerCase();
@@ -173,7 +375,16 @@ export function StudentPlacementTable() {
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between gap-4 items-center">
                 <h2 className="text-2xl font-bold">Individual Placement Records</h2>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        multiple
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleFileUpload}
+                    />
+
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -183,17 +394,26 @@ export function StudentPlacementTable() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Button variant="outline" onClick={handleExport}>
+
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="whitespace-nowrap">
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import
+                    </Button>
+                    <Button variant="outline" onClick={handlePasteFromClipboard} className="whitespace-nowrap" title="Ctrl+V to paste">
+                        <Clipboard className="mr-2 h-4 w-4" />
+                        Paste
+                    </Button>
+                    <Button variant="outline" onClick={handleExport} className="whitespace-nowrap">
                         <FileDown className="mr-2 h-4 w-4" />
                         Export
                     </Button>
-                    <Button variant="outline" onClick={() => setIsColumnDialogOpen(true)}>
+                    <Button variant="outline" onClick={() => setIsColumnDialogOpen(true)} className="whitespace-nowrap">
                         <Columns className="mr-2 h-4 w-4" />
-                        Add Column
+                        Add Col
                     </Button>
-                    <Button onClick={() => { setEditingId(null); setIsDialogOpen(true); }}>
+                    <Button onClick={() => { setEditingId(null); setIsDialogOpen(true); }} className="whitespace-nowrap">
                         <Plus className="mr-2 h-4 w-4" />
-                        Add New Row
+                        Add New
                     </Button>
                 </div>
             </div>
@@ -431,7 +651,7 @@ function PlacementRecordDialog({
                             <h4 className="font-semibold text-sm border-b pb-2">Company Details</h4>
                             <div className="space-y-2">
                                 <Label>Company Name</Label>
-                                <Input {...form.register("company_name", { required: true })} />
+                                <Input {...form.register("company_name")} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Company Email</Label>
@@ -456,11 +676,11 @@ function PlacementRecordDialog({
                             <h4 className="font-semibold text-sm border-b pb-2">Student Details</h4>
                             <div className="space-y-2">
                                 <Label>Student Name</Label>
-                                <Input {...form.register("student_name", { required: true })} />
+                                <Input {...form.register("student_name")} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Student ID (Reg No)</Label>
-                                <Input {...form.register("student_id", { required: true })} />
+                                <Input {...form.register("student_id")} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Department</Label>
@@ -473,6 +693,7 @@ function PlacementRecordDialog({
                                                 <SelectValue placeholder="Select Dept" />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="AIDS">AIDS</SelectItem>
                                                 {departments?.map((dept: any) => (
                                                     <SelectItem key={dept.id} value={dept.code}>
                                                         {dept.code}

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PlacementRecordTable } from "@/components/shared/PlacementRecordTable";
+import { StudentPlacementTable } from "@/components/placement/StudentPlacementTable";
 import {
   BarChart,
   Bar,
@@ -282,8 +283,18 @@ export default function CoordinatorOverview() {
           </Card>
         </div>
 
-        {/* Placement Record Table */}
-        <PlacementRecordTable />
+        {/* Placement Record Table (Company Drives) */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold tracking-tight">Placement Drives</h2>
+          </div>
+          <PlacementRecordTable />
+        </div>
+
+        {/* Student Placement Table (Individual Offers) */}
+        <div className="space-y-4 pt-8">
+          <StudentPlacementTable />
+        </div>
       </div>
     </DashboardLayout >
   );
