@@ -26,6 +26,7 @@ import {
   Settings,
   Plus,
   Briefcase,
+  Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ const tpoNavItems: NavItem[] = [
   { title: "Placement Records", url: "/dashboard/tpo/student-placements", icon: Briefcase },
   { title: "Statistics", url: "/dashboard/tpo/statistics", icon: BarChart3 },
   { title: "Reports", url: "/dashboard/tpo/reports", icon: FileText },
+  { title: "Master Data", url: "/dashboard/tpo/master-data", icon: Database },
   { title: "Add Placement", url: "/dashboard/tpo/add-placement", icon: Plus },
 ];
 

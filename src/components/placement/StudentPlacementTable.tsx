@@ -241,9 +241,55 @@ export function StudentPlacementTable() {
             const wb = XLSX.read(data);
             const ws = wb.Sheets[wb.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(ws);
-            const mapped = json.map(mapExcelRowToStudentPlacement);
-            if (mapped.length) bulkInsertMutation.mutate(mapped);
-        } catch (e) { toast.error("File upload failed"); }
+            let mapped = json.map(mapExcelRowToStudentPlacement);
+
+            if (mapped.length) {
+                // 1. Extract IDs and Names
+                const studentIds = mapped.map(r => r.student_id).filter(Boolean);
+                const companyNames = mapped.map(r => r.company_name).filter(Boolean);
+
+                // 2. Fetch Master Data
+                const { data: students } = await supabase
+                    .from("master_students" as any)
+                    .select("*")
+                    .in("student_id", studentIds);
+
+                const { data: companies } = await supabase
+                    .from("master_companies" as any)
+                    .select("*")
+                    .in("company_name", companyNames);
+
+                const studentMap = new Map(students?.map((s: any) => [s.student_id, s]));
+                const companyMap = new Map(companies?.map((c: any) => [c.company_name, c]));
+
+                // 3. Merge Data
+                mapped = mapped.map(record => {
+                    const masterStudent = record.student_id ? studentMap.get(record.student_id) : null;
+                    const masterCompany = record.company_name ? companyMap.get(record.company_name) : null;
+
+                    return {
+                        ...record,
+                        student_name: record.student_name || masterStudent?.student_name || "",
+                        student_mail: record.student_mail || masterStudent?.student_mail || "",
+                        student_mobile: record.student_mobile || masterStudent?.student_mobile || "",
+                        student_address: record.student_address || masterStudent?.student_address || "",
+                        department: record.department || masterStudent?.department || "",
+                        current_year: record.current_year || masterStudent?.current_year || record.current_year,
+                        semester: record.semester || masterStudent?.semester || record.semester,
+
+                        company_mail: record.company_mail || masterCompany?.company_mail || "",
+                        company_address: record.company_address || masterCompany?.company_address || "",
+                        hr_name: record.hr_name || masterCompany?.hr_name || "",
+                        hr_mail: record.hr_mail || masterCompany?.hr_mail || "",
+                    };
+                });
+
+                bulkInsertMutation.mutate(mapped);
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("File upload failed");
+        }
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
@@ -523,7 +569,22 @@ function PlacementRecordDialog({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Company Name</Label>
-                            <Input {...form.register("company_name")} />
+                            <Input
+                                {...form.register("company_name")}
+                                onBlur={async (e) => {
+                                    form.register("company_name").onBlur(e);
+                                    const val = e.target.value;
+                                    if (val) {
+                                        const { data } = await supabase.from("master_companies" as any).select("*").eq("company_name", val).single();
+                                        if (data) {
+                                            if (!form.getValues("company_mail")) form.setValue("company_mail", data.company_mail || "");
+                                            if (!form.getValues("company_address")) form.setValue("company_address", data.company_address || "");
+                                            if (!form.getValues("hr_name")) form.setValue("hr_name", data.hr_name || "");
+                                            if (!form.getValues("hr_mail")) form.setValue("hr_mail", data.hr_mail || "");
+                                        }
+                                    }
+                                }}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Company Mail</Label>
@@ -547,7 +608,27 @@ function PlacementRecordDialog({
                         </div>
                         <div className="space-y-2">
                             <Label>Student ID</Label>
-                            <Input {...form.register("student_id")} />
+                            <Input
+                                {...form.register("student_id")}
+                                onBlur={async (e) => {
+                                    form.register("student_id").onBlur(e);
+                                    const val = e.target.value;
+                                    if (val) {
+                                        const { data } = await supabase.from("master_students" as any).select("*").eq("student_id", val).single();
+                                        if (data) {
+                                            if (!form.getValues("student_name")) form.setValue("student_name", data.student_name || "");
+                                            if (!form.getValues("student_mail")) form.setValue("student_mail", data.student_mail || "");
+                                            if (!form.getValues("student_mobile")) form.setValue("student_mobile", data.student_mobile || "");
+                                            // Ensure department code matches select options
+                                            if (!form.getValues("department") && data.department) {
+                                                // Try to find matching dept code roughly
+                                                // Ideally master data has same codes, but we warn if mismatch
+                                                form.setValue("department", data.department);
+                                            }
+                                        }
+                                    }
+                                }}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Student Email</Label>

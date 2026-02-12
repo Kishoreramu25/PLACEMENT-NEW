@@ -23,6 +23,7 @@ import DepartmentDrives from "./pages/Dashboard/DepartmentCoordinator/Department
 import ManagementOverview from "./pages/Dashboard/Management/Overview";
 import Placements from "./pages/Placements";
 import AddPlacement from "./pages/Dashboard/PlacementOfficer/AddPlacement";
+import MasterData from "./pages/Dashboard/PlacementOfficer/MasterData";
 import StudentRecords from "./pages/Dashboard/PlacementOfficer/StudentRecords";
 import Settings from "./pages/Dashboard/Settings";
 
@@ -86,6 +87,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["placement_officer"]}>
                   <AddPlacement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/tpo/master-data"
+              element={
+                <ProtectedRoute allowedRoles={["placement_officer"]}>
+                  <MasterData />
                 </ProtectedRoute>
               }
             />

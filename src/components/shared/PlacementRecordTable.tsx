@@ -36,6 +36,7 @@ interface PlacementRecord {
     company_type: string;
     salary_package: string;
     remark: string;
+    reference_faculty: string;
     [key: string]: any; // Support dynamic fields
 }
 
@@ -59,8 +60,16 @@ export function PlacementRecordTable() {
         "v_company_mail_id",
         "company_type",
         "salary_package",
-        "remark"
+        "remark",
+        "reference_faculty"
     ];
+
+    const isRowEmpty = (record: PlacementRecord) => {
+        return COLUMN_KEYS.every(key => {
+            const val = record[key];
+            return val === null || val === undefined || val === "";
+        });
+    };
 
     // Search and Filter State
     const [searchTerm, setSearchTerm] = useState("");
@@ -84,7 +93,8 @@ export function PlacementRecordTable() {
         { label: "Company", key: "v_company_name" },
         { label: "Location", key: "v_location" },
         { label: "Company Type", key: "company_type" },
-        { label: "Date of Visit", key: "date_of_visit" }
+        { label: "Date of Visit", key: "date_of_visit" },
+        { label: "Reference Faculty", key: "reference_faculty" }
     ];
 
     const filteredRecords = records.filter((record) => {
@@ -95,7 +105,8 @@ export function PlacementRecordTable() {
                 (record.v_location?.toLowerCase() || "").includes(lowerSearch) ||
                 (record.v_company_contact_person?.toLowerCase() || "").includes(lowerSearch) ||
                 (record.v_company_mail_id?.toLowerCase() || "").includes(lowerSearch) ||
-                (record.remark?.toLowerCase() || "").includes(lowerSearch)
+                (record.remark?.toLowerCase() || "").includes(lowerSearch) ||
+                (record.reference_faculty?.toLowerCase() || "").includes(lowerSearch)
             );
             if (!matchesSearch) return false;
         }
@@ -140,6 +151,7 @@ export function PlacementRecordTable() {
                                     company_type: "IT",
                                     salary_package: "",
                                     remark: "",
+                                    reference_faculty: "",
                                 };
                             }
                             cells.forEach((cellValue, cOffset) => {
@@ -263,6 +275,7 @@ export function PlacementRecordTable() {
             company_type: "IT",
             salary_package: "",
             remark: "",
+            reference_faculty: "",
         };
         setRecords([newRecord, ...records]);
     };
@@ -435,8 +448,26 @@ export function PlacementRecordTable() {
 
         const getVal = (keys: string[]) => String(findKeyByFuzzyMatch(keys) || "").trim();
 
+        const normalizeVisitType = (val: string): string => {
+            const visitTypeMap: Record<string, string> = {
+                "on campus": "On Campus",
+                "oncampus": "On Campus",
+                "off campus": "Off Campus",
+                "offcampus": "Off Campus",
+                "direct": "Direct",
+                "phone call": "Phone Call",
+                "phonecall": "Phone Call",
+                "pooled": "Pooled",
+                "internship/ppo": "Internship/PPO",
+                "internship": "Internship/PPO",
+                "ppo": "Internship/PPO",
+                "hackathon": "Hackathon",
+            };
+            return visitTypeMap[val.toLowerCase().trim()] || val;
+        };
+
         return {
-            v_visit_type: getVal(["v_visit_type", "Visit Type", "Type", "Mode"]),
+            v_visit_type: normalizeVisitType(getVal(["v_visit_type", "Visit Type", "Type", "Mode"])),
             date_of_visit: parseExcelDate(findKeyByFuzzyMatch(["date_of_visit", "Date of Visit", "Date", "Visit Date", "Arrival"])),
             v_company_name: getVal(["v_company_name", "Company Name", "Name of Company", "Company", "Organization"]),
             v_company_address: getVal(["v_company_address", "Company Address", "Address", "Office Address"]),
@@ -447,6 +478,7 @@ export function PlacementRecordTable() {
             company_type: getVal(["company_type", "Company Type", "Sector", "Industry"]),
             salary_package: getVal(["salary_package", "Salary Package", "Package", "CTC", "LPA", "Salary"]),
             remark: getVal(["remark", "Remark", "Notes", "Status"]),
+            reference_faculty: getVal(["reference_faculty", "Reference Faculty", "Faculty", "Ref Faculty", "Faculty Ref", "Faculty Name"]),
         };
     };
 
@@ -579,6 +611,7 @@ export function PlacementRecordTable() {
             "Company Type": r.company_type,
             "Salary Package": r.salary_package,
             "Remark": r.remark,
+            "Reference Faculty": r.reference_faculty,
             ...Object.fromEntries(customColumns.map(col => [col, r[col] || ""]))
         }));
 
@@ -696,10 +729,10 @@ export function PlacementRecordTable() {
                             variant={hideEmpty ? "secondary" : "outline"}
                             onClick={() => setHideEmpty(!hideEmpty)}
                             className="shadow-sm whitespace-nowrap"
-                            title={hideEmpty ? "Show all columns/rows" : "Hide empty columns/rows"}
+                            title={hideEmpty ? "Show all columns" : "Show only 100% filled columns (Strict View)"}
                         >
                             {hideEmpty ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                            {hideEmpty ? "Unhide Empty" : "Hide Empty"}
+                            {hideEmpty ? "Disable Strict View" : "Enable Strict View"}
                         </Button>
                     </div>
                 </div>
@@ -826,21 +859,23 @@ export function PlacementRecordTable() {
                                     { key: "v_company_mail_id", label: "Email" },
                                     { key: "company_type", label: "Sector" },
                                     { key: "salary_package", label: "Package" },
-                                    { key: "remark", label: "Remarks" }
+                                    { key: "remark", label: "Remarks" },
+                                    { key: "reference_faculty", label: "Reference Faculty" }
                                 ];
 
                                 const isCellEmpty = (val: any) => val === null || val === undefined || val === "";
 
-                                const isColEmpty = (key: string) => {
-                                    return filteredRecords.every(r => isCellEmpty(r[key]));
+                                const hasMissingData = (key: string) => {
+                                    // Strict View: Hide column if ANY visible record has missing data
+                                    return filteredRecords.some(r => isCellEmpty(r[key]));
                                 };
 
                                 const visibleStandardCols = hideEmpty
-                                    ? standardCols.filter(col => !isColEmpty(col.key))
+                                    ? standardCols.filter(col => !hasMissingData(col.key))
                                     : standardCols;
 
                                 const visibleCustomCols = hideEmpty
-                                    ? customColumns.filter(col => !isColEmpty(col))
+                                    ? customColumns.filter(col => !hasMissingData(col))
                                     : customColumns;
 
                                 return (
@@ -890,27 +925,22 @@ export function PlacementRecordTable() {
                                 const standardCols = [
                                     "v_visit_type", "date_of_visit", "v_company_name", "v_company_address",
                                     "v_location", "v_company_contact_person", "v_company_contact_number",
-                                    "v_company_mail_id", "company_type", "salary_package", "remark"
+                                    "v_company_mail_id", "company_type", "salary_package", "remark",
+                                    "reference_faculty"
                                 ];
 
                                 const isCellEmpty = (val: any) => val === null || val === undefined || val === "";
 
-                                const isColEmpty = (key: string) => {
-                                    return filteredRecords.every(r => isCellEmpty(r[key]));
-                                };
-
-                                const isRowEmpty = (r: PlacementRecord) => {
-                                    const standardEmpty = standardCols.every(key => isCellEmpty(r[key]));
-                                    const customEmpty = customColumns.every(key => isCellEmpty(r[key]));
-                                    return standardEmpty && customEmpty;
+                                const hasMissingData = (key: string) => {
+                                    return filteredRecords.some(r => isCellEmpty(r[key]));
                                 };
 
                                 const visibleStandardCols = hideEmpty
-                                    ? standardCols.filter(key => !isColEmpty(key))
+                                    ? standardCols.filter(key => !hasMissingData(key))
                                     : standardCols;
 
                                 const visibleCustomCols = hideEmpty
-                                    ? customColumns.filter(key => !isColEmpty(key))
+                                    ? customColumns.filter(key => !hasMissingData(key))
                                     : customColumns;
 
                                 const rowsToShow = hideEmpty
@@ -935,6 +965,8 @@ export function PlacementRecordTable() {
                                                                 <>
                                                                     <SelectItem value="On Campus">On Campus</SelectItem>
                                                                     <SelectItem value="Off Campus">Off Campus</SelectItem>
+                                                                    <SelectItem value="Direct">Direct</SelectItem>
+                                                                    <SelectItem value="Phone Call">Phone Call</SelectItem>
                                                                     <SelectItem value="Pooled">Pooled</SelectItem>
                                                                     <SelectItem value="Internship/PPO">Internship/PPO</SelectItem>
                                                                     <SelectItem value="Hackathon">Hackathon</SelectItem>
