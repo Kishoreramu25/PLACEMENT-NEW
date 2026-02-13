@@ -968,7 +968,6 @@ export function PlacementRecordTable() {
                                                                     <SelectItem value="Direct">Direct</SelectItem>
                                                                     <SelectItem value="Phone Call">Phone Call</SelectItem>
                                                                     <SelectItem value="Pooled">Pooled</SelectItem>
-                                                                    <SelectItem value="Internship/PPO">Internship/PPO</SelectItem>
                                                                     <SelectItem value="Hackathon">Hackathon</SelectItem>
                                                                 </>
                                                             ) : (
