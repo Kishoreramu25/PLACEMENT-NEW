@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Save, Trash2, Upload, Loader2, RefreshCw, Download, Clipboard, Eye, EyeOff, X } from "lucide-react";
+import { Plus, Save, Trash2, Upload, Loader2, RefreshCw, Download, Clipboard, Eye, EyeOff, X, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -21,6 +21,15 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Definition to match PLACEMENT_TEMPLATE.xlsx and placement_records table (Designation removed)
 interface PlacementRecord {
@@ -48,6 +57,7 @@ export function PlacementRecordTable() {
     const [focusedCell, setFocusedCell] = useState<{ index: number, field: string } | null>(null);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [hideEmpty, setHideEmpty] = useState(false);
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
 
     const COLUMN_KEYS: (keyof PlacementRecord)[] = [
         "v_visit_type",
@@ -362,13 +372,13 @@ export function PlacementRecordTable() {
             }
 
             if (toInsert.length > 0) {
-                const { error } = await (supabase
-                    .from("placement_records" as any) as any)
-                    .insert(toInsert);
+                // Use RPC for transactional bulk insert
+                const { error } = await supabase.rpc('bulk_insert_placement_records', { records: toInsert });
                 if (error) throw error;
             }
 
             toast.success("All records saved successfully!");
+            setIsSuccessDialogOpen(true);
             fetchRecords();
         } catch (error: any) {
             console.error("Save error:", error);
@@ -493,7 +503,7 @@ export function PlacementRecordTable() {
         try {
             const allFileResults = await Promise.all(fileList.map(async (file) => {
                 const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data);
+                const workbook = XLSX.read(data, { type: 'array' });
                 let fileRecords: PlacementRecord[] = [];
 
                 workbook.SheetNames.forEach(sheetName => {
@@ -685,7 +695,7 @@ export function PlacementRecordTable() {
                             multiple
                         />
                         <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="shadow-sm">
-                            <Upload className="mr-2 h-4 w-4" /> Import Excel
+                            <Upload className="mr-2 h-4 w-4" /> Import Excel/CSV
                         </Button>
                         <Button onClick={handlePasteFromClipboard} variant="outline" className="shadow-sm bg-primary/5 border-primary/20 hover:bg-primary/10">
                             <Clipboard className="mr-2 h-4 w-4 text-primary" /> Paste New Rows
@@ -1028,6 +1038,22 @@ export function PlacementRecordTable() {
                     </Table>
                 </div >
             </CardContent >
+
+            <AlertDialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-green-600 flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5" /> Saved Successfully
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            All changes have been committed to the database.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => setIsSuccessDialogOpen(false)}>OK</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card >
     );
 }
