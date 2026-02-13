@@ -26,6 +26,7 @@ import AddPlacement from "./pages/Dashboard/PlacementOfficer/AddPlacement";
 import MasterData from "./pages/Dashboard/PlacementOfficer/MasterData";
 import StudentRecords from "./pages/Dashboard/PlacementOfficer/StudentRecords";
 import Settings from "./pages/Dashboard/Settings";
+import AppGuide from "./pages/Dashboard/AppGuide";
 
 const queryClient = new QueryClient();
 
@@ -143,12 +144,20 @@ const App = () => (
               }
             />
 
-            {/* Common Settings */}
+            {/* Common Settings & Guide */}
             <Route
               path="/dashboard/settings"
               element={
                 <ProtectedRoute allowedRoles={["placement_officer", "department_coordinator", "management"]}>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/app-guide"
+              element={
+                <ProtectedRoute allowedRoles={["placement_officer", "department_coordinator", "management"]}>
+                  <AppGuide />
                 </ProtectedRoute>
               }
             />

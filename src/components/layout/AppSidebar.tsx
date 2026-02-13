@@ -27,6 +27,7 @@ import {
   Plus,
   Briefcase,
   Database,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,24 +39,23 @@ interface NavItem {
 
 const tpoNavItems: NavItem[] = [
   { title: "Overview", url: "/dashboard/tpo", icon: LayoutDashboard },
-  { title: "Companies", url: "/dashboard/tpo/companies", icon: Building2 },
-  { title: "Placement Drives", url: "/dashboard/tpo/drives", icon: CalendarDays },
   { title: "Placement Records", url: "/dashboard/tpo/student-placements", icon: Briefcase },
   { title: "Statistics", url: "/dashboard/tpo/statistics", icon: BarChart3 },
-  { title: "Reports", url: "/dashboard/tpo/reports", icon: FileText },
-  { title: "Master Data", url: "/dashboard/tpo/master-data", icon: Database },
   { title: "Add Placement", url: "/dashboard/tpo/add-placement", icon: Plus },
+  { title: "App Guide", url: "/dashboard/app-guide", icon: BookOpen },
 ];
 
 const coordinatorNavItems: NavItem[] = [
   { title: "OVERALL RECORD", url: "/dashboard/coordinator", icon: LayoutDashboard },
   { title: "MY RECORDS", url: "/dashboard/coordinator/student-placements", icon: Briefcase },
+  { title: "App Guide", url: "/dashboard/app-guide", icon: BookOpen },
 ];
 
 const managementNavItems: NavItem[] = [
   { title: "Overview", url: "/dashboard/management", icon: LayoutDashboard },
   { title: "Analytics", url: "/dashboard/management/analytics", icon: PieChart },
   { title: "Trends", url: "/dashboard/management/trends", icon: TrendingUp },
+  { title: "App Guide", url: "/dashboard/app-guide", icon: BookOpen },
 ];
 
 export function AppSidebar() {
